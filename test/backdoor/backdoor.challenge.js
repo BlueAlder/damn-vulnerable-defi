@@ -79,7 +79,7 @@ describe('[Challenge] Backdoor', function () {
 
         // Do exploit in one transaction (after contract deployment)
         await attackModule.exploit(users, setupData);
-        
+          
         await checkTokenBalance(attacker.address, "Attacker");
 
     });

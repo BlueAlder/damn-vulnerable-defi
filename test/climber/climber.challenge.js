@@ -101,7 +101,7 @@ describe('[Challenge] Climber', function () {
             attacker.address);
 
         // Deploy contract that will act as new logic contract for vault
-        const MalciousVaultFactory = await ethers.getContractFactory("VaultExploit", attacker);
+        const MalciousVaultFactory = await ethers.getContractFactory("AttackVault", attacker);
         const maliciousVaultContract = await MalciousVaultFactory.deploy();
 
         const PROPOSER_ROLE = ethers.utils.keccak256(ethers.utils.toUtf8Bytes("PROPOSER_ROLE"));

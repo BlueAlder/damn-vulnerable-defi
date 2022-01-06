@@ -6,14 +6,14 @@ import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-import "./ClimberTimelock.sol";
+import "../../climber/ClimberTimelock.sol";
 
 /**
  * @title ClimberVault
  * @dev To be deployed behind a proxy following the UUPS pattern. Upgrades are to be triggered by the owner.
  * @author Damn Vulnerable DeFi (https://damnvulnerabledefi.xyz)
  */
-contract VaultExploit is Initializable, OwnableUpgradeable, UUPSUpgradeable {
+contract AttackVault is Initializable, OwnableUpgradeable, UUPSUpgradeable {
 
     uint256 public constant WITHDRAWAL_LIMIT = 1 ether;
     uint256 public constant WAITING_PERIOD = 15 days;

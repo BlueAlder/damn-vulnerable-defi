@@ -59,7 +59,7 @@ describe('[Challenge] Backdoor', function () {
         await checkTokenBalance(attacker.address, "Attacker");
 
         // Deploy attacking contract
-        const AttackModuleFactory = await ethers.getContractFactory("AttackModule", attacker);
+        const AttackModuleFactory = await ethers.getContractFactory("AttackBackdoor", attacker);
         const attackModule = await AttackModuleFactory.deploy(
             attacker.address,
             attackerFactory.address,

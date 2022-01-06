@@ -166,7 +166,7 @@ describe('[Challenge] Free Rider', function () {
         await logBalances(attacker.address, "attacker");
 
 
-        const AttackFactory = await ethers.getContractFactory("FlashSwapWin", attacker);
+        const AttackFactory = await ethers.getContractFactory("AttackFreeRider", attacker);
         const attackContract = await AttackFactory.deploy(
             attackWeth.address, 
             attackFactory.address,

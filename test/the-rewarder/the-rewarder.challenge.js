@@ -68,6 +68,34 @@ describe('[Challenge] The rewarder', function () {
         ).to.be.eq('2');
     });
 
+    /**
+     * @dev
+     * Exploit Overview:
+     *
+     * This attack works but borrowing a large amount of tokens in the lending pool
+     * to increase our proportion in the rewards pool for an instant when the rewards
+     * are distributed.
+     * 
+     * Since rewards are proportional to how much you put in (contribution / total_in_pool)
+     * we can contribute 99% of the tokens in the pool and then get the rewards and immediately
+     * withdraw.
+     * 
+     * So exploit goes
+     * 
+     * 1. Deploy smart contract 
+     * 2. Advance in time 5 days when rewards are available again
+     * 3. SC requests flash loan of all tokens
+     * 4. SC receives callback with the tokens
+     * 5. SC deposits all tokens in the Reward Pool via deposit()
+     * 6. The deposit() function kicks off the distributeRewards()
+     * 7. Rewards are passed to the SC
+     * 8. SC immediately withdraws tokens
+     * 9. Tokens are handed back to the lending pool
+     * 10. Rewards tokens are transferred to attacker wallet.
+     * 
+     * Exploit contact code available at:
+     * "contracts/attacker-contracts/AttackReward.sol"
+     */
     it('Exploit', async function () {
         /** CODE YOUR EXPLOIT HERE */
         console.log("***********************EXPLOIT****************")
@@ -82,19 +110,8 @@ describe('[Challenge] The rewarder', function () {
 
         await ethers.provider.send("evm_increaseTime", [5 * 24 * 60 * 60]); // 5 days
 
-        const tokenAttacker = this.liquidityToken.connect(attacker);
-        await tokenAttacker.approve(this.rewarderPool.address, TOKENS_IN_LENDER_POOL)
-        
-        const tokensApproved = await tokenAttacker.allowance(attacker.address, this.rewarderPool.address);
-        const tokensInPool = await tokenAttacker.balanceOf(this.flashLoanPool.address);
-
-        console.log("Balance of FlashLoan:", tokensInPool.toString());
-        console.log("Tokens approved:", tokensApproved.toString());
-        console.log("Attack contract address:", attacker.address);
-        await attackContract.attack(tokensApproved);
-
-        // const tokensInPool = await tokenAttacker.balanceOf(this.flashLoanPool.address);
-        // const attackerRewards = await this.rewarderPool.balanceOf(attacker.address)
+        // Run attack
+        await attackContract.attack(TOKENS_IN_LENDER_POOL);
     });
 
     after(async function () {

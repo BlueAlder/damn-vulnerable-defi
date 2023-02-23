@@ -22,9 +22,9 @@ contract AttackWalletMining {
             if iszero(extcodesize(m)) {return(0, 0)}
             // load free memory address at 0x40 into p
             let p := mload(0x40)
-            // store p + 0x44 at p to update free memory pointer
+            // store [p + 0x44] at 0x40 to update free memory pointer
             mstore(0x40,add(p,0x44))
-            // store at p the sighash for the can function
+            // store at p the sighash for the can() function in AuthorizeUpgrader
             mstore(p,shl(0xe0,0x4538c4eb))
             // store at p + 0x04 the imp address
             mstore(add(p,0x04),u)

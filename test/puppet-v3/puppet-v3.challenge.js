@@ -140,6 +140,54 @@ describe('[Challenge] Puppet v3', function () {
 
     it('Execution', async function () {
         /** CODE YOUR SOLUTION HERE */
+       
+        /**
+         * Initial Bals
+         * Player ETH: 1
+         * PLayer TOK: 110
+         * 
+         * Uniswap Pool ETH: 100
+         * Uniswap Pool TOK: 100
+         * 
+         * LP: 1 000 000
+         * 
+         * Interesting things to look at:
+         *  uniswapPositionManger
+         *  oracleLibrary -> consult
+         * 
+         * Oracle is taken as the arithmatic mean of the last 10 minutes
+         */
+        const log = console.log;
+
+        const attackPool = await uniswapPool.connect(player);
+        const attackLendingPool = await lendingPool.connect(player);
+        const attackToken = await token.connect(player);
+
+        const attackPuppet = await (await ethers.getContractFactory("AttackPuppetV3", player)).deploy(
+            token.address,
+            weth.address,
+            attackLendingPool.address,
+            attackPool.address
+        );
+
+        log(attackPuppet.address)
+        // await attackPuppet.performSwap();
+        await attackToken.transfer(attackPuppet.address, await attackToken.balanceOf(player.address));
+        console.log(await attackToken.balanceOf(attackPuppet.address));
+
+
+        console.log(await attackPool.slot0())
+        return;
+        await attackPool.swap(
+            attackPuppet.address,
+            false,
+            ethers.utils.parseEther("100"),
+            0,
+            [],
+            {
+                gasLimit: 1e7
+            }
+        )
     });
 
     after(async function () {

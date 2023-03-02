@@ -47,7 +47,7 @@ describe('[Challenge] ABI smuggling', function () {
      * @dev
      * Exploit overview
      * 
-     * The exploit in this challenge is this little bit of code here is when
+     * The exploit in this challenge is when
      * the AuthorizedExecutor retrieves the selector from the actionData
      * parameter. Because it is using a hardcoded calldata offset and the 
      * actionData parameter is a dynamic type of bytes, we can change the offset

